@@ -122,18 +122,103 @@ tsv-select -f 1,4 fields.tsv |
 
 ```
 
-## Pairwise seed distance
+## Domain similarity
+
+* The `#=GR PP` annotation
+    * The posterior probability is encoded as 11 possible characters 0-9*+: 0.0 <= p < 0.05 is coded
+      as 0, 0.05 <= p < 0.15 is coded as 1, (... and so on ...), 0.85 <= p < 0.95 is coded as 9, and
+      0.95 <= p <= 1.0 is coded as ’*’. Gap characters appear in the PP line where no residue has
+      been assigned.
 
 ```shell
 cd $HOME/data/ddr/pfam35
 
+mkdir domains
+
+if [[ ! -f Pfam-A.hmm ]]; then
+    gzip -dcf Pfam-A.hmm.gz > Pfam-A.hmm
+fi
+hmmfetch --index Pfam-A.hmm
+
+# hmmfetch can't be used in this seed file
 if [[ ! -f Pfam-A.seed ]]; then
     gzip -dcf Pfam-A.seed.gz > Pfam-A.seed
 fi
-
 esl-afetch --index Pfam-A.seed
 
-esl-afetch --outformat a2m Pfam-A.seed ZZ |
-    faops filter -d stdin stdout
+cat <<EOF > sample.domain.lst
+AAA
+Fer2
+GATA
+ZZ
+EOF
+
+cat sample.domain.lst |
+while read D; do
+    # a2m files created by esl are not well aligned
+    # afa uses . as gaps
+    esl-afetch --outformat afa Pfam-A.seed ${D} |
+        perl -nl -e '
+            $_ !~ /^>/ and s/\./-/g;
+            print;
+        ' \
+        > domains/${D}.fas
+    faops filter -d -l 0 domains/${D}.fas domains/${D}.fasta
+
+    # as a list of names
+    faops size domains/${D}.fasta > domains/${D}.sizes
+
+    # the hmm profile
+    hmmfetch Pfam-A.hmm ${D} > domains/${D}.hmm
+
+done
+
+cat sample.domain.lst |
+while read S; do `# seed`
+    cat sample.domain.lst |
+    while read D; do `# domain`
+        echo >&2 -e "seed ${S}\tdomain ${D}"
+        hmmalign --amino --trim domains/${D}.hmm domains/${S}.fasta
+    done
+done
+
+```
+
+## Useless
+
+### alfpy
+
+Very fast, but unable to distinguish different structural domains from the similarity results
+
+```shell
+cd $HOME/data/ddr/pfam35
+
+pip install alfpy
+
+calc_bbc.py --fasta domains/ZZ.fasta -m protein --outfmt pairwise
+calc_wmetric.py --fasta domains/ZZ.fasta --outfmt pairwise
+calc_word.py --fasta domains/ZZ.fasta --word_size 3 --outfmt pairwise
+
+calc_bbc.py --fasta <(cat domains/*.fasta) -m protein --outfmt pairwise |
+    grep RSC8_YEAST
+
+calc_wmetric.py --fasta <(cat domains/*.fasta) --outfmt pairwise |
+    grep RSC8_YEAST
+
+calc_word.py --fasta <(cat domains/*.fasta) --vector counts --distance google --word_size 1 --outfmt pairwise |
+    grep RSC8_YEAST
+
+```
+
+### pseqsid
+
+Unable to specify output file name and output format
+
+```shell
+cd $HOME/data/ddr/pfam35
+
+cargo install pseqsid
+
+pseqsid -n domains/ZZ.fas
 
 ```
