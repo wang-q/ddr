@@ -124,11 +124,7 @@ tsv-select -f 1,4 fields.tsv |
 
 ## Domain similarity
 
-* The `#=GR PP` annotation
-    * The posterior probability is encoded as 11 possible characters 0-9*+: 0.0 <= p < 0.05 is coded
-      as 0, 0.05 <= p < 0.15 is coded as 1, (... and so on ...), 0.85 <= p < 0.95 is coded as 9, and
-      0.95 <= p <= 1.0 is coded as ’*’. Gap characters appear in the PP line where no residue has
-      been assigned.
+### Extract HMM profiles and seed sequences
 
 ```shell
 cd $HOME/data/ddr/pfam35
@@ -173,12 +169,66 @@ while read D; do
 
 done
 
+```
+
+### Compute
+
+* The `#=GR PP` annotation
+    * The posterior probability is encoded as 11 possible characters 0-9*+: 0.0 <= p < 0.05 is coded
+      as 0, 0.05 <= p < 0.15 is coded as 1, (... and so on ...), 0.85 <= p < 0.95 is coded as 9, and
+      0.95 <= p <= 1.0 is coded as ’*’. Gap characters appear in the PP line where no residue has
+      been assigned.
+
+```text
+seed ZZ domain GATA
+# STOCKHOLM 1.0
+
+RSC8_YEAST/254-298           CHTCGNES-INVRYHnlRARDTNLCSRC----------
+#=GR RSC8_YEAST/254-298   PP 55555433.4444333433334488888..........
+YOY6_CAEEL/8-52              CFSCFTTK-------..---------------------
+#=GR YOY6_CAEEL/8-52      PP 88899886..............................
+DMD_MOUSE/3300-3345          ---------------..KHFNYDICQSC----------
+#=GR DMD_MOUSE/3300-3345  PP .................33445555555..........
+REF2P_DROME/121-165          ---------------..---NYDLCQKCELAHKH----
+#=GR REF2P_DROME/121-165  PP ....................678*****999997....
+ADA2_YEAST/1-46              ---------------..----YDLCVPC----------
+#=GR ADA2_YEAST/1-46      PP .....................3466666..........
+CBP1_CAEEL/1493-1532         ---------------..-------CNKC----------
+#=GR CBP1_CAEEL/1493-1532 PP ........................5555..........
+CBP_MOUSE/1702-1743          CINCYNTK-------..---------------------
+#=GR CBP_MOUSE/1702-1743  PP 55555555..............................
+#=GC PP_cons                 66666655.444433..33355577777999997....
+#=GC RF                      xxxxxxxxxxxxxxx..xxxxxxxxxxxxxxxxxxxxx
+//
+```
+
+```shell
+cd $HOME/data/ddr/pfam35
+
 cat sample.domain.lst |
 while read S; do `# seed`
     cat sample.domain.lst |
     while read D; do `# domain`
-        echo >&2 -e "seed ${S}\tdomain ${D}"
-        hmmalign --amino --trim domains/${D}.hmm domains/${S}.fasta
+        echo >&2 -e "seed: ${S}\tdomain: ${D}"
+
+        hmmalign --amino --trim domains/${D}.hmm domains/${S}.fasta |
+            T=5 perl -nl -e '
+                if ( m(^#=GR\s+([\w/_-]+)\s+PP\s+(.+)$) ) {
+                    my $name = $1;
+                    my $pp = $2;
+                    $pp =~ s/[0-$ENV{T}.]//g; # Removal of unqualified PP characters
+
+                    print join qq(\t), $name, length $pp;
+                }
+            ' |
+            tsv-join -f domains/${S}.sizes -k 1 -a 2 |
+            perl -nla -F"\t" -e '
+                @F == 3 or next;
+                print $F[1] / $F[2];
+            ' |
+            tsv-summarize --median 1 |
+            perl -nl -e 'printf qq(%.4f\n), $_' |
+            (printf "${S}\t${D}\t" && cat)
     done
 done
 
