@@ -104,7 +104,7 @@ gzip -dcf Pfam-A.hmm.dat.gz |
         }
         if ($_ eq q(//)) {
             my @fields = ();
-            for $k (qw(ID AC TP CL DE)) {
+            for $k (qw(ID AC TP CL ML DE)) {
                 push @fields, $info{$k};
             }
             print join qq(\t), @fields;
@@ -119,6 +119,12 @@ tsv-select -f 2,1 fields.tsv > AC-ID.tsv
 tsv-select -f 1,4 fields.tsv |
     tsv-filter --not-empty 2 \
     > ID-CL.tsv
+
+# idx  name                 accession        nseq eff_nseq      M relent   info p relE compKL
+#hmmstat Pfam-A.hmm.gz |
+#    grep -v "^#" |
+#    tr -s ' ' |
+#    cut -d ' ' -f2,4,6
 
 ```
 
