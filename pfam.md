@@ -126,9 +126,20 @@ tsv-select -f 1,4 fields.tsv |
 #    tr -s ' ' |
 #    cut -d ' ' -f2,4,6
 
+cat fields.tsv |
+    tsv-filter --lt 5:20
+
+cat fields.tsv |
+    tsv-filter --gt 5:1000
+
+cat fields.tsv |
+    tsv-filter --char-len-gt 1:14
+
 ```
 
-## Domain similarity
+## Similarity between Domains
+
+Goodness of seed sequences--profile alignments
 
 ### Extract HMM profiles and seed sequences
 
@@ -150,8 +161,12 @@ esl-afetch --index Pfam-A.seed
 
 cat <<EOF > sample.domain.lst
 AAA
+ABC_tran
+ABC_trans_N
+Arena_RNA_pol
 Fer2
 GATA
+Prion_octapep
 ZZ
 EOF
 
@@ -165,9 +180,11 @@ while read D; do
             print;
         ' \
         > domains/${D}.fas
+
+    # remove dashes
     faops filter -d -l 0 domains/${D}.fas domains/${D}.fasta
 
-    # as a list of names
+    # also as a list of names
     faops size domains/${D}.fasta > domains/${D}.sizes
 
     # the hmm profile
@@ -177,13 +194,22 @@ done
 
 ```
 
-### Compute
+### Example of `hmmalign`
 
 * The `#=GR PP` annotation
     * The posterior probability is encoded as 11 possible characters 0-9*+: 0.0 <= p < 0.05 is coded
       as 0, 0.05 <= p < 0.15 is coded as 1, (... and so on ...), 0.85 <= p < 0.95 is coded as 9, and
       0.95 <= p <= 1.0 is coded as ’*’. Gap characters appear in the PP line where no residue has
       been assigned.
+
+```shell
+cd $HOME/data/ddr/pfam35
+
+hmmalign --amino --trim domains/GATA.hmm domains/ZZ.fasta
+
+hmmalign --amino --trim domains/Prion_octapep.hmm domains/Prion_octapep.fasta
+
+```
 
 ```text
 seed ZZ domain GATA
@@ -208,6 +234,10 @@ CBP_MOUSE/1702-1743          CINCYNTK-------..---------------------
 //
 ```
 
+### Compute
+
+* 为了减少随机因素的影响，在此使用中位数
+
 ```shell
 cd $HOME/data/ddr/pfam35
 
@@ -215,28 +245,55 @@ cat sample.domain.lst |
 while read S; do `# seed`
     cat sample.domain.lst |
     while read D; do `# domain`
-        echo >&2 -e "seed: ${S}\tdomain: ${D}"
-
-        hmmalign --amino --trim domains/${D}.hmm domains/${S}.fasta |
-            T=5 perl -nl -e '
-                if ( m(^#=GR\s+([\w/_-]+)\s+PP\s+(.+)$) ) {
-                    my $name = $1;
-                    my $pp = $2;
-                    $pp =~ s/[0-$ENV{T}.]//g; # Removal of unqualified PP characters
-
-                    print join qq(\t), $name, length $pp;
-                }
-            ' |
-            tsv-join -f domains/${S}.sizes -k 1 -a 2 |
-            perl -nla -F"\t" -e '
-                @F == 3 or next;
-                print $F[1] / $F[2];
-            ' |
-            tsv-summarize --median 1 |
-            perl -nl -e 'printf qq(%.4f\n), $_' |
-            (printf "${S}\t${D}\t" && cat)
+        echo -e "${S}=${D}"
     done
-done
+done \
+    > sample.job.lst
+
+touch dds.tsv
+
+cat sample.job.lst |
+tsv-join -f dds.tsv -k 1 -e |
+while IFS='=' read -r S D; do
+    echo >&2 -e "seed: ${S}\tdomain: ${D}"
+
+    DL=$(
+        cat fields.tsv |
+            tsv-filter --str-eq "1:${D}" |
+            tsv-select -f 5
+    )
+
+    hmmalign --amino --trim domains/${D}.hmm domains/${S}.fasta |
+        T=5 perl -nl -e '
+            if ( m(^#=GR\s+([\w/_-]+)\s+PP\s+(.+)$) ) {
+                my $name = $1;
+                my $pp = $2;
+                $pp =~ s/[0-$ENV{T}.]//g; # Removal of unqualified PP characters
+
+                print join qq(\t), $name, length $pp;
+            }
+        ' |
+        tsv-join -f domains/${S}.sizes -k 1 -a 2 |
+        DL=${DL} perl -nla -F"\t" -e '
+            @F == 3 or next;
+            print $F[1] / $F[2], qq(\t), $F[1] / $ENV{DL};
+        ' |
+        tsv-summarize --median 1 --median 2 |
+        perl -nla -F"\t" -e 'printf qq(%.4f\t%.4f\n), $F[0], $F[1]' |
+        (printf "${S}=${D}\t" && cat)
+done \
+    > dds.tmp
+
+# Combine new results with the old ones
+cat dds.tsv dds.tmp |
+    tsv-uniq |
+    sort \
+    > tmp.tsv
+mv tmp.tsv dds.tsv
+rm *.tmp
+
+cat dds.tsv |
+    tsv-filter --or --gt 2:0 --gt 3:0
 
 ```
 
@@ -244,7 +301,7 @@ done
 
 ### alfpy
 
-Very fast, but unable to distinguish different structural domains from the similarity results
+Very fast, but unable to distinguish different domains from the similarity results
 
 ```shell
 cd $HOME/data/ddr/pfam35
