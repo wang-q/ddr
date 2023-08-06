@@ -207,12 +207,12 @@ cd $HOME/data/ddr/pfam35
 
 hmmalign --amino --trim domains/GATA.hmm domains/ZZ.fasta
 
-hmmalign --amino --trim domains/Prion_octapep.hmm domains/Prion_octapep.fasta
+hmmalign --amino --trim domains/ZZ.hmm domains/Prion_octapep.fasta
 
 ```
 
 ```text
-seed ZZ domain GATA
+seed: ZZ    profile: GATA
 # STOCKHOLM 1.0
 
 RSC8_YEAST/254-298           CHTCGNES-INVRYHnlRARDTNLCSRC----------
@@ -241,11 +241,15 @@ CBP_MOUSE/1702-1743          CINCYNTK-------..---------------------
 ```shell
 cd $HOME/data/ddr/pfam35
 
+cp ~/Scripts/ddr/bin/ss-p.sh .
+
+# bash ss-p.sh ZZ GATA
+
 cat sample.domain.lst |
 while read S; do `# seed`
     cat sample.domain.lst |
-    while read D; do `# domain`
-        echo -e "${S}=${D}"
+    while read P; do `# profile`
+        echo -e "${S}=${P}"
     done
 done \
     > sample.job.lst
@@ -254,33 +258,10 @@ touch dds.tsv
 
 cat sample.job.lst |
 tsv-join -f dds.tsv -k 1 -e |
-while IFS='=' read -r S D; do
-    echo >&2 -e "seed: ${S}\tdomain: ${D}"
+while IFS='=' read -r S P; do
+    echo >&2 -e "seed: ${S}\tprofile: ${P}"
 
-    DL=$(
-        cat fields.tsv |
-            tsv-filter --str-eq "1:${D}" |
-            tsv-select -f 5
-    )
-
-    hmmalign --amino --trim domains/${D}.hmm domains/${S}.fasta |
-        T=5 perl -nl -e '
-            if ( m(^#=GR\s+([\w/_-]+)\s+PP\s+(.+)$) ) {
-                my $name = $1;
-                my $pp = $2;
-                $pp =~ s/[0-$ENV{T}.]//g; # Removal of unqualified PP characters
-
-                print join qq(\t), $name, length $pp;
-            }
-        ' |
-        tsv-join -f domains/${S}.sizes -k 1 -a 2 |
-        DL=${DL} perl -nla -F"\t" -e '
-            @F == 3 or next;
-            print $F[1] / $F[2], qq(\t), $F[1] / $ENV{DL};
-        ' |
-        tsv-summarize --median 1 --median 2 |
-        perl -nla -F"\t" -e 'printf qq(%.4f\t%.4f\n), $F[0], $F[1]' |
-        (printf "${S}=${D}\t" && cat)
+    bash ss-p.sh ${S} ${P}
 done \
     > dds.tmp
 
