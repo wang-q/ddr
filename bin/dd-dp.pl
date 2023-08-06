@@ -45,6 +45,10 @@ The Needleman--Wunsch Algorithm
 
 Reference:
 
+L<https://pubmed.ncbi.nlm.nih.gov/5420325/>
+
+L<https://bioboot.github.io/bimm143_W20/class-material/nw/>
+
 L<https://gist.github.com/bibymaths/b1d649fe0ed6e641bf3948cc4d36ebe9>
 
 L<https://metacpan.org/pod/Algorithm::NeedlemanWunsch>
@@ -74,8 +78,7 @@ my @mat;
     chomp( $l = <> );
     my $t = [ split( $opt_separator, $l ) ];
 
-    # print YAML::Syck::Dump($s);
-    # print YAML::Syck::Dump($t);
+    # print YAML::Syck::Dump([$s, $t]);
 
     # fill
     similarity( $s, $t );
