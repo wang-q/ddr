@@ -1,4 +1,4 @@
-# PFAM
+# PFAM-A domains
 
 ## Download
 
@@ -30,7 +30,7 @@ aria2c -x 4 -s 2 -c https://ftp.ebi.ac.uk/pub/databases/Pfam/releases/Pfam35.0/P
 * DE Definition:          Short description of family
 * GA Gathering threshold: Search threshold to build the full alignment
 * TP Type:                Type of family -- presently Family, Domain, Motif or Repeat for Pfam
-* ML
+* ML:                     (Domain length)
 * CL Clan:                Clan accession
 * NE Pfam accession:      Indicates a nested domain.
 
@@ -137,7 +137,7 @@ cat fields.tsv |
 
 ```
 
-## Similarity between Domains
+## Similarity between two domains
 
 Goodness of seed sequences--profile alignments
 
