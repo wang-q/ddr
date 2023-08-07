@@ -144,53 +144,50 @@ Goodness of seed sequences--profile alignments
 ### Extract HMM profiles and seed sequences
 
 ```shell
-cd $HOME/data/ddr/pfam35
+mkdir -p $HOME/data/ddr/pfam/profile
+mkdir -p $HOME/data/ddr/pfam/fas
+mkdir -p $HOME/data/ddr/pfam/seed
 
-mkdir domains
+cd $HOME/data/ddr/pfam
+
+cp ../pfam35/fields.tsv .
 
 if [[ ! -f Pfam-A.hmm ]]; then
-    gzip -dcf Pfam-A.hmm.gz > Pfam-A.hmm
+    gzip -dcf ../pfam35/Pfam-A.hmm.gz > Pfam-A.hmm
 fi
 hmmfetch --index Pfam-A.hmm
 
 # hmmfetch can't be used in this seed file
 if [[ ! -f Pfam-A.seed ]]; then
-    gzip -dcf Pfam-A.seed.gz > Pfam-A.seed
+    gzip -dcf ../pfam35/Pfam-A.seed.gz > Pfam-A.seed
 fi
 esl-afetch --index Pfam-A.seed
 
-cat <<EOF > sample.domain.lst
-AAA
-ABC_tran
-ABC_trans_N
-Arena_RNA_pol
-Fer2
-GATA
-Prion_octapep
-ZZ
-EOF
+cat fields.tsv |
+tsv-select -f 1 |
+parallel --no-run-if-empty --linebuffer -k -j 8 '
+    if [ $(({#} % 100)) -eq "0" ]; then
+        >&2 printf "."
+    fi
 
-cat sample.domain.lst |
-while read D; do
     # a2m files created by esl are not well aligned
     # afa uses . as gaps
-    esl-afetch --outformat afa Pfam-A.seed ${D} |
-        perl -nl -e '
+    esl-afetch --outformat afa Pfam-A.seed {} |
+        perl -nl -e '\''
             $_ !~ /^>/ and s/\./-/g;
             print;
-        ' \
-        > domains/${D}.fas
+        '\'' \
+        > fas/{}.fas
 
     # remove dashes
-    faops filter -d -l 0 domains/${D}.fas domains/${D}.fasta
+    faops filter -d -l 0 fas/{}.fas seed/{}.fasta
 
     # also as a list of names
-    faops size domains/${D}.fasta > domains/${D}.sizes
+    faops size seed/{}.fasta > seed/{}.sizes
 
     # the hmm profile
-    hmmfetch Pfam-A.hmm ${D} > domains/${D}.hmm
-
-done
+    hmmfetch Pfam-A.hmm {} > profile/{}.hmm
+'
 
 ```
 
@@ -203,11 +200,22 @@ done
       been assigned.
 
 ```shell
-cd $HOME/data/ddr/pfam35
+cd $HOME/data/ddr/pfam
 
-hmmalign --amino --trim domains/GATA.hmm domains/ZZ.fasta
+hmmalign --amino --trim profile/GATA.hmm seed/ZZ.fasta
 
-hmmalign --amino --trim domains/ZZ.hmm domains/Prion_octapep.fasta
+hmmalign --amino --trim profile/ZZ.hmm seed/Prion_octapep.fasta
+
+cat <<EOF > sample.domain.lst
+AAA
+ABC_tran
+ABC_trans_N
+Arena_RNA_pol
+Fer2
+GATA
+Prion_octapep
+ZZ
+EOF
 
 ```
 
@@ -239,7 +247,7 @@ CBP_MOUSE/1702-1743          CINCYNTK-------..---------------------
 * 为了减少随机因素的影响，在此使用中位数
 
 ```shell
-cd $HOME/data/ddr/pfam35
+cd $HOME/data/ddr/pfam
 
 cp ~/Scripts/ddr/bin/ss-p.sh .
 
@@ -247,34 +255,62 @@ cp ~/Scripts/ddr/bin/ss-p.sh .
 
 cat sample.domain.lst |
 while read S; do `# seed`
-    cat sample.domain.lst |
+    cat fields.tsv |
+    tsv-select -f 1 |
     while read P; do `# profile`
         echo -e "${S}=${P}"
     done
 done \
     > sample.job.lst
 
-touch dds.tsv
+touch s2d.tsv
 
 cat sample.job.lst |
-tsv-join -f dds.tsv -k 1 -e |
-while IFS='=' read -r S P; do
-    echo >&2 -e "seed: ${S}\tprofile: ${P}"
+tsv-join -f s2d.tsv -k 1 -e |
+parallel --colsep "=" --no-run-if-empty --linebuffer -k -j 8 '
+    if [ $(({#} % 100)) -eq "0" ]; then
+        >&2 printf "."
+    fi
+    bash ss-p.sh {1} {2}
+    ' \
+    > s2d.tmp
 
-    bash ss-p.sh ${S} ${P}
-done \
-    > dds.tmp
+#while IFS='=' read -r S P; do
+#    echo >&2 -e "seed: ${S}\tprofile: ${P}"
+#
+#    bash ss-p.sh ${S} ${P}
+#done
 
 # Combine new results with the old ones
-cat dds.tsv dds.tmp |
+cat s2d.tsv s2d.tmp |
     tsv-uniq |
     sort \
     > tmp.tsv
-mv tmp.tsv dds.tsv
+mv tmp.tsv s2d.tsv
 rm *.tmp
 
-cat dds.tsv |
+cat s2d.tsv |
     tsv-filter --or --gt 2:0 --gt 3:0
+
+```
+
+### Rsync to hpcc
+
+```bash
+rsync -avP \
+    ~/data/ddr/ \
+    wangq@202.119.37.251:data/ddr
+
+rsync -avP \
+    -e 'ssh -p 8804' \
+    ~/data/ddr/ \
+    wangq@58.213.64.36:data/ddr
+
+# back
+rsync -avP \
+    -e 'ssh -p 8804' \
+    wangq@58.213.64.36:data/ddr/ \
+    ~/data/ddr
 
 ```
 
