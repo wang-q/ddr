@@ -81,7 +81,7 @@ P_LEN=$(
         tsv-select -f 5
 )
 
-hmmalign --amino --trim domains/${PROFILE}.hmm domains/${SEED}.fasta |
+hmmalign --amino --trim profile/${PROFILE}.hmm seed/${SEED}.fasta |
     T=5 perl -nl -e '
         if ( m(^#=GR\s+([\w/_-]+)\s+PP\s+(.+)$) ) {
             my $name = $1;
@@ -91,7 +91,7 @@ hmmalign --amino --trim domains/${PROFILE}.hmm domains/${SEED}.fasta |
             print join qq(\t), $name, length $pp;
         }
     ' |
-    tsv-join -f domains/${SEED}.sizes -k 1 -a 2 |
+    tsv-join -f seed/${SEED}.sizes -k 1 -a 2 |
     P_LEN=${P_LEN} perl -nla -F"\t" -e '
         @F == 3 or next;
         print $F[1] / $F[2], qq(\t), $F[1] / $ENV{P_LEN};
