@@ -139,7 +139,10 @@ cat fields.tsv |
 
 ## Similarity between two domains
 
-Goodness of seed sequences--profile alignments
+Scripts:
+
+1. `ss-p.sh` - seed sequences--profile alignments
+2. `norm.sh` - normalize data to 0-1 range. $z_i=\frac{x_i-\min(x)}{\max(x)-\min(x)}$
 
 ### Extract HMM profiles and seed sequences
 
@@ -244,12 +247,13 @@ CBP_MOUSE/1702-1743          CINCYNTK-------..---------------------
 
 ### Compute
 
-* 为了减少随机因素的影响，在此使用中位数
+* 为了减少随机因素的影响，在 `ss-p.sh` 里使用中位数
 
 ```shell
 cd $HOME/data/ddr/pfam
 
 cp ~/Scripts/ddr/bin/ss-p.sh .
+cp ~/Scripts/ddr/bin/norm.sh .
 
 # bash ss-p.sh ZZ GATA
 
@@ -271,6 +275,9 @@ parallel --colsep "=" --no-run-if-empty --linebuffer -k -j 8 '
     if [ $(({#} % 100)) -eq "0" ]; then
         >&2 printf "."
     fi
+    if [ $(({#} % 10000)) -eq "0" ]; then
+        >&2 printf "\n"
+    fi
     bash ss-p.sh {1} {2}
     ' \
     > s2d.tmp
@@ -291,6 +298,12 @@ rm *.tmp
 
 cat s2d.tsv |
     tsv-filter --or --gt 2:0 --gt 3:0
+
+bash norm.sh s2d.tsv 2 "^AAA="
+
+cat s2d.tsv |
+    grep "^ZZ=" |
+    tsv-summarize --mean 2 --stdev 2
 
 ```
 
