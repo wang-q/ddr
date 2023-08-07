@@ -27,6 +27,7 @@ dd-dp.pl - Domain distance via dynamic programming
         --go            FLT     Gap opening, default is -0.01
         --ge            FLT     Gap extension, default is -0.001
         --spe       -s  STR     Separator of fields, default is "\t"
+        --header                Inputs have header lines
 
 =head1 EXAMPLE
 
@@ -38,6 +39,9 @@ dd-dp.pl - Domain distance via dynamic programming
 
     $ echo -e 'a b c d e f g h\nb c h' |
         perl dd-dp.pl --sep " "
+
+    $ echo -e '>seq1\na b c d e f g h\n>seq2\nb c h' |
+        perl dd-dp.pl --sep " " --header
 
 =head1 DESCRIPTION
 
@@ -57,34 +61,57 @@ L<https://metacpan.org/pod/Algorithm::NeedlemanWunsch>
 
 Getopt::Long::GetOptions(
     'help|?'  => sub { Getopt::Long::HelpMessage(0) },
-    'ma=f'    => \( my $opt_match         = 1.0 ),
-    'mm=f'    => \( my $opt_mismatch      = 0.0 ),
-    'go=f'    => \( my $opt_gap_opening   = -0.01 ),
-    'ge=f'    => \( my $opt_gap_extension = -0.001 ),
-    'sep|s=s' => \( my $opt_separator     = "\t" ),
+    'ma=f'    => \( my $opt_match       = 1.0 ),
+    'mm=f'    => \( my $opt_mismatch    = 0.0 ),
+    'go=f'    => \( my $opt_gap_penalty = -0.01 ),
+    'sep|s=s' => \( my $opt_separator   = "\t" ),
+    'header'  => \( my $opt_has_header ),
 ) or Getopt::Long::HelpMessage(1);
 
 #----------------------------------------------------------#
 # Start
 #----------------------------------------------------------#
 
-# Global Variables
-# The alignment matrix
-my @mat;
+while (1) {
+    my $l = <>;
+    last if !defined $l;
+    last if length $l == 0;
+    chomp($l);
 
-{
-    chomp( my $l = <> );
-    my $s = [ split( $opt_separator, $l ) ];
-    chomp( $l = <> );
-    my $t = [ split( $opt_separator, $l ) ];
+    my ( $sh, $th );
+    my ( $s,  $t );
+    if ( defined $opt_has_header ) {
+        $sh = $l;
+        chomp( $l = <> );
+        $s = [ split( $opt_separator, $l ) ];
+
+        chomp( $l = <> );
+        $th = $l;
+        chomp( $l = <> );
+        $t = [ split( $opt_separator, $l ) ];
+    }
+    else {
+        $s = [ split( $opt_separator, $l ) ];
+        chomp( $l = <> );
+        $t = [ split( $opt_separator, $l ) ];
+    }
 
     # print YAML::Syck::Dump([$s, $t]);
 
-    # fill
-    similarity( $s, $t );
+    # fill the alignment matrix
+    my $mat = similarity( $s, $t );
 
-    for my $x ( align( $s, $t ) ) {
-        print join( $opt_separator, @{$x} ), "\n";
+    my ( $sa, $ta ) = align( $mat, $s, $t );
+
+    if ( defined $opt_has_header ) {
+        print "$sh\n";
+        print join( $opt_separator, @{$sa} ), "\n";
+        print "$th\n";
+        print join( $opt_separator, @{$ta} ), "\n";
+    }
+    else {
+        print join( $opt_separator, @{$sa} ), "\n";
+        print join( $opt_separator, @{$ta} ), "\n";
     }
 }
 
@@ -107,29 +134,33 @@ sub similarity {
     my $s = shift;
     my $t = shift;
 
-    for my $i ( 0 .. scalar @{$s} ) { $mat[$i][0] = $opt_gap_opening * $i; }
-    for my $j ( 0 .. scalar @{$t} ) { $mat[0][$j] = $opt_gap_opening * $j; }
+    my $mat = [ [] ];
+
+    for my $i ( 0 .. scalar @{$s} ) { $mat->[$i][0] = $opt_gap_penalty * $i; }
+    for my $j ( 0 .. scalar @{$t} ) { $mat->[0][$j] = $opt_gap_penalty * $j; }
 
     for my $i ( 1 .. scalar @{$s} ) {
         for my $j ( 1 .. scalar @{$t} ) {
             my $p = compare( $s->[ $i - 1 ], $t->[ $j - 1 ] );
 
-            $mat[$i][$j] = List::Util::max(
+            $mat->[$i][$j] = List::Util::max(
                 0,
-                $mat[ $i - 1 ][$j] + $opt_gap_opening,
-                $mat[$i][ $j - 1 ] + $opt_gap_opening,
-                $mat[ $i - 1 ][ $j - 1 ] + $p
+                $mat->[ $i - 1 ][$j] + $opt_gap_penalty,
+                $mat->[$i][ $j - 1 ] + $opt_gap_penalty,
+                $mat->[ $i - 1 ][ $j - 1 ] + $p
             );
         }
     }
 
-    # Returns nothing but fills @mat.
-    return ( $mat[ scalar @{$s} ][ scalar @{$t} ] );
+    return $mat;
 }
 
 # Recursively reconstructs best alignment
 # Returns two array refs
 sub align {
+
+    # 2D array
+    my $mat = shift;
 
     # array ref
     my $s = shift;
@@ -140,27 +171,27 @@ sub align {
     return ( $s,             [ ("-") x $i ] ) if ( $j == 0 );
     my ( $s_last, $t_last ) = ( $s->[-1], $t->[-1] );
 
-    if (
-        $mat[$i][$j] == $mat[ $i - 1 ][ $j - 1 ] + compare( $s_last, $t_last ) )
+    if ( $mat->[$i][$j] ==
+        $mat->[ $i - 1 ][ $j - 1 ] + compare( $s_last, $t_last ) )
     {
         # Case 1: last elements are paired in the best alignment
         my ( $sa, $ta ) =
-          align( [ @{$s}[ 0 .. $i - 2 ] ], [ @{$t}[ 0 .. $j - 2 ] ] );
+          align( $mat, [ @{$s}[ 0 .. $i - 2 ] ], [ @{$t}[ 0 .. $j - 2 ] ] );
         push @{$sa}, $s_last;
         push @{$ta}, $t_last;
         return ( $sa, $ta );
     }
-    elsif ( $mat[$i][$j] == $mat[ $i - 1 ][$j] + $opt_gap_opening ) {
+    elsif ( $mat->[$i][$j] == $mat->[ $i - 1 ][$j] + $opt_gap_penalty ) {
 
         # Case 2: last element of the 1st array is paired with a gap
-        my ( $sa, $ta ) = align( [ @{$s}[ 0 .. $i - 2 ] ], $t );
+        my ( $sa, $ta ) = align( $mat, [ @{$s}[ 0 .. $i - 2 ] ], $t );
         push @{$sa}, $s_last;
         push @{$ta}, "-";
         return ( $sa, $ta );
     }
     else {
         # Case 3: last element of the 2nd array is paired with a gap
-        my ( $sa, $ta ) = align( $s, [ @{$t}[ 0 .. $j - 2 ] ] );
+        my ( $sa, $ta ) = align( $mat, $s, [ @{$t}[ 0 .. $j - 2 ] ] );
         push @{$sa}, "-";
         push @{$ta}, $t_last;
         return ( $sa, $ta );
