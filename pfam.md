@@ -298,10 +298,35 @@ while read F; do
     "
 done
 
+bash norm.sh s2d/AAA.tsv 4
+
+```
+
+### Stats of ss-p
+
+```shell
+cd $HOME/data/ddr/pfam
+
 cat s2d/ZZ.tsv |
     tsv-filter --or --gt 2:0 --gt 3:0
 
-bash norm.sh s2d/AAA.tsv 3
+cat fields.tsv |
+    tsv-select -f 1 |
+    parallel --no-run-if-empty --linebuffer -k -j 16 '
+        if [ ! -e "s2d/{}.tsv" ]; then
+            exit
+        fi
+
+        shopt -s lastpipe
+
+        cat s2d/{}.tsv |
+            tsv-filter --ne 4:0 |
+            tsv-summarize --count |
+            read COUNT
+
+        printf "%s\t%d\n" {} $COUNT
+    ' \
+    > non-zero.count.tsv
 
 ```
 
@@ -332,21 +357,21 @@ rsync -avP \
 Very fast, but unable to distinguish different domains from the similarity results
 
 ```shell
-cd $HOME/data/ddr/pfam35
+cd $HOME/data/ddr/pfam
 
 pip install alfpy
 
-calc_bbc.py --fasta domains/ZZ.fasta -m protein --outfmt pairwise
-calc_wmetric.py --fasta domains/ZZ.fasta --outfmt pairwise
-calc_word.py --fasta domains/ZZ.fasta --word_size 3 --outfmt pairwise
+calc_bbc.py --fasta seed/ZZ.fasta -m protein --outfmt pairwise
+calc_wmetric.py --fasta seed/ZZ.fasta --outfmt pairwise
+calc_word.py --fasta seed/ZZ.fasta --word_size 3 --outfmt pairwise
 
-calc_bbc.py --fasta <(cat domains/*.fasta) -m protein --outfmt pairwise |
+calc_bbc.py --fasta <(cat seed/*.fasta) -m protein --outfmt pairwise |
     grep RSC8_YEAST
 
-calc_wmetric.py --fasta <(cat domains/*.fasta) --outfmt pairwise |
+calc_wmetric.py --fasta <(cat seed/*.fasta) --outfmt pairwise |
     grep RSC8_YEAST
 
-calc_word.py --fasta <(cat domains/*.fasta) --vector counts --distance google --word_size 1 --outfmt pairwise |
+calc_word.py --fasta <(cat seed/*.fasta) --vector counts --distance google --word_size 1 --outfmt pairwise |
     grep RSC8_YEAST
 
 ```
@@ -356,10 +381,10 @@ calc_word.py --fasta <(cat domains/*.fasta) --vector counts --distance google --
 Unable to specify output file name and output format
 
 ```shell
-cd $HOME/data/ddr/pfam35
+cd $HOME/data/ddr/pfam
 
 cargo install pseqsid
 
-pseqsid -n domains/ZZ.fas
+pseqsid -n seed/ZZ.fas
 
 ```
