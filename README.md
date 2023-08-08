@@ -32,16 +32,22 @@ DDR - Domain distance remix
    D777–D784 (2023).
     * Methods for constructing fungal phylogenies
 
-## Databases
+## Knowledge
 
-* Pfam 35
-* NCBI CDD
-* Panther 17
+* Algorithm
+    * Dynamic programming
+    * Needleman--Wunsch
+    * Hidden Markov model
 
-## Software
+* Databases
+    * Pfam 35
+    * NCBI CDD
+    * Panther 17
 
-* Hmmer 3, easel
-* Interproscan
-* BUSCO
-* AUGUSTUS-PPX
-* miniprot
+* Software
+    * Hmmer 3, easel
+    * Interproscan
+    * BUSCO
+    * AUGUSTUS-PPX
+    * miniprot
+
