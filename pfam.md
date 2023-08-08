@@ -261,33 +261,47 @@ cp ~/Scripts/ddr/bin/norm.sh .
 
 # bash ss-p.sh ZZ GATA
 
+cat <<'EOF' > run.s2d.sh
+cat $1 |
+    tsv-join -f s2d.done.lst -k 1 -e |
+    while read S; do `# seed`
+        echo >&2 -e "\n==> ${S}"
+        cat fields.tsv |
+            tsv-select -f 1 |
+            parallel --no-run-if-empty --linebuffer -k -j 16 "
+                if [ \$(({#} % 100)) -eq '0' ]; then
+                    >&2 printf '.'
+                fi
+                bash ss-p.sh $S {}
+                " \
+            > s2d/${S}.tsv
+
+        echo ${S} >> s2d.done.lst
+    done
+EOF
+
 touch s2d.done.lst
 
-cat sample.domain.lst |
-tsv-join -f s2d.done.lst -k 1 -e |
-while read S; do `# seed`
-    echo >&2 -e "\n==> ${S}"
-    cat fields.tsv |
-        tsv-select -f 1 |
-        parallel --no-run-if-empty --linebuffer -k -j 16 "
-            if [ \$(({#} % 100)) -eq '0' ]; then
-                >&2 printf '.'
-            fi
-            bash ss-p.sh $S {}
-            " \
-        > s2d/${S}.tsv
+#bash run.s2d.sh sample.domain.lst
 
-    echo ${S} >> s2d.done.lst
+mkdir -p jobs
+
+cat fields.tsv |
+    tsv-select -f 1 |
+    split -l 200 -d -a 3 - jobs/split.
+
+find jobs/ -maxdepth 1 -type f -name "split.*" | sort |
+while read F; do
+    echo ${F}
+    bsub -q mpi -n 24 -J "${F}" "
+        bash run.s2d.sh ${F}
+    "
 done
 
 cat s2d/Prion_octapep.tsv |
     tsv-filter --or --gt 2:0 --gt 3:0
 
 bash norm.sh s2d/AAA.tsv 3
-
-cat s2d.tsv |
-    grep "^ZZ=" |
-    tsv-summarize --mean 2 --stdev 2
 
 ```
 
