@@ -142,7 +142,9 @@ cat fields.tsv |
 Scripts:
 
 1. `ss-p.sh` - seed sequences--profile alignments
-2. `norm.sh` - normalize data to 0-1 range. $z_i=\frac{x_i-\min(x)}{\max(x)-\min(x)}$
+2. `norm.sh`
+   * normalize data to 0-1 range. $z_i=\frac{x_i-\min(x)}{\max(x)-\min(x)}$
+   * normalized = 1.2 * (data - min_val) / (max_val - min_val) - 0.2
 
 ### Extract HMM profiles and seed sequences
 
@@ -252,54 +254,36 @@ CBP_MOUSE/1702-1743          CINCYNTK-------..---------------------
 ```shell
 cd $HOME/data/ddr/pfam
 
+mkdir -p s2d
+
 cp ~/Scripts/ddr/bin/ss-p.sh .
 cp ~/Scripts/ddr/bin/norm.sh .
 
 # bash ss-p.sh ZZ GATA
 
+touch s2d.done.lst
+
 cat sample.domain.lst |
+tsv-join -f s2d.done.lst -k 1 -e |
 while read S; do `# seed`
+    echo >&2 -e "\n==> ${S}"
     cat fields.tsv |
-    tsv-select -f 1 |
-    while read P; do `# profile`
-        echo -e "${S}=${P}"
-    done
-done \
-    > sample.job.lst
+        tsv-select -f 1 |
+        parallel --no-run-if-empty --linebuffer -k -j 16 "
+            if [ \$(({#} % 100)) -eq '0' ]; then
+                >&2 printf '.'
+            fi
+            bash ss-p.sh $S {}
+            " \
+        > s2d/${S}.tsv
 
-touch s2d.tsv
+    echo ${S} >> s2d.done.lst
+done
 
-cat sample.job.lst |
-tsv-join -f s2d.tsv -k 1 -e |
-parallel --colsep "=" --no-run-if-empty --linebuffer -k -j 8 '
-    if [ $(({#} % 100)) -eq "0" ]; then
-        >&2 printf "."
-    fi
-    if [ $(({#} % 10000)) -eq "0" ]; then
-        >&2 printf "\n"
-    fi
-    bash ss-p.sh {1} {2}
-    ' \
-    > s2d.tmp
-
-#while IFS='=' read -r S P; do
-#    echo >&2 -e "seed: ${S}\tprofile: ${P}"
-#
-#    bash ss-p.sh ${S} ${P}
-#done
-
-# Combine new results with the old ones
-cat s2d.tsv s2d.tmp |
-    tsv-uniq |
-    sort \
-    > tmp.tsv
-mv tmp.tsv s2d.tsv
-rm *.tmp
-
-cat s2d.tsv |
+cat s2d/Prion_octapep.tsv |
     tsv-filter --or --gt 2:0 --gt 3:0
 
-bash norm.sh s2d.tsv 2 "^AAA="
+bash norm.sh s2d/AAA.tsv 3
 
 cat s2d.tsv |
     grep "^ZZ=" |

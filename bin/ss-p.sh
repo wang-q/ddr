@@ -98,4 +98,8 @@ hmmalign --amino --trim profile/${PROFILE}.hmm seed/${SEED}.fasta |
     ' |
     tsv-summarize --median 1 --median 2 |
     perl -nla -F"\t" -e 'printf qq(%.4f\t%.4f\n), $F[0], $F[1]' |
+    perl -nla -F"\t" -e '
+        my $min = $F[0] < $F[1] ? $F[0] : $F[1];
+        print join qq(\t), (@F, $min);
+        ' |
     (printf "${SEED}=${PROFILE}\t" && cat)
