@@ -247,7 +247,7 @@ CBP_MOUSE/1702-1743          CINCYNTK-------..---------------------
 //
 ```
 
-### Compute
+### Compute ss-p
 
 * 为了减少随机因素的影响，在 `ss-p.sh` 里使用中位数
 
@@ -298,7 +298,7 @@ while read F; do
     "
 done
 
-cat s2d/Prion_octapep.tsv |
+cat s2d/ZZ.tsv |
     tsv-filter --or --gt 2:0 --gt 3:0
 
 bash norm.sh s2d/AAA.tsv 3
@@ -307,7 +307,7 @@ bash norm.sh s2d/AAA.tsv 3
 
 ### Rsync to hpcc
 
-```bash
+```shell
 rsync -avP \
     ~/data/ddr/ \
     wangq@202.119.37.251:data/ddr
