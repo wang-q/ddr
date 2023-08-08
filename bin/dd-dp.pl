@@ -82,8 +82,8 @@ L<https://metacpan.org/pod/Algorithm::NeedlemanWunsch>
 Getopt::Long::GetOptions(
     'help|?'   => sub { Getopt::Long::HelpMessage(0) },
     'ma=f'     => \( my $opt_match       = 1.0 ),
-    'mm=f'     => \( my $opt_mismatch    = -0.5 ),
-    'gp=f'     => \( my $opt_gap_penalty = -0.1 ),
+    'mm=f'     => \( my $opt_mismatch    = -0.2 ),
+    'gp=f'     => \( my $opt_gap_penalty = -0.01 ),
     'sep|s=s'  => \( my $opt_separator   = "\t" ),
     'header|H' => \( my $opt_has_header ),
     'dd'       => \( my $opt_dd ),

@@ -58,9 +58,9 @@ export -f readlinkf
 # Usage
 #----------------------------#
 USAGE="
-Usage: $0 <INFILE> <COL> [PATTERN]
+Usage: $0 <INFILE> <COL>
 
-$ bash z-score.sh s2d.tsv 2 '^ZZ='
+$ bash norm.sh s2d/AAA.tsv 2
 
 "
 
@@ -71,34 +71,23 @@ fi
 
 INFILE=$1
 COL=$2
-PATTERN=$3
 
 #----------------------------#
 # Run
 #----------------------------#
 shopt -s lastpipe # let `read` modifies variables
 
-if [ -n ${PATTERN} ]; then
-    cat s2d.tsv |
-        grep "${PATTERN}"
-else
-    cat s2d.tsv
-fi |
+cat ${INFILE} |
     tsv-summarize --min ${COL} --max ${COL} |
     IFS=$'\t' read -r MIN MAX
 
 #echo $MIN $MAX
 
-if [ -n ${PATTERN} ]; then
-    cat s2d.tsv |
-        grep "${PATTERN}"
-else
-    cat s2d.tsv
-fi |
+cat ${INFILE} |
     COL=${COL} MIN=${MIN} MAX=${MAX} perl -nla -F"\t" -e '
         my $col = $ENV{COL} - 1;
         my $x = $F[$col];
         next if $x == 0;
-        my $z = ($x - $ENV{MIN}) / $ENV{MAX};
-        print join qq(\t), (@F, sprintf(qq(%.4f), $z));
+        my $norm = 1.2 * ($x - $ENV{MIN}) / ($ENV{MAX} - $ENV{MIN}) - 0.2;
+        print join qq(\t), (@F, sprintf(qq(%.4f), $norm));
     '
