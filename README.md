@@ -45,7 +45,7 @@ DDR - Domain distance remix
     * Panther 17
 
 * Software
-    * Hmmer 3, easel
+    * Hmmer 3, easel; HMMER User’s Guide
     * Interproscan
     * BUSCO
     * AUGUSTUS-PPX
