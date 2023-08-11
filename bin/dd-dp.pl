@@ -73,6 +73,8 @@ L<https://bioboot.github.io/bimm143_W20/class-material/nw/>
 
 L<https://gist.github.com/bibymaths/b1d649fe0ed6e641bf3948cc4d36ebe9>
 
+L<https://ealizadeh.com/blog/tutorial-string2string/>
+
 L<https://metacpan.org/pod/Algorithm::NeedlemanWunsch>
 
 '\t' can't be passed easily in the command line
