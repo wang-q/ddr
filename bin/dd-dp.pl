@@ -25,7 +25,7 @@ dd-dp.pl - Domain distance via dynamic programming
         --ma            FLT     Match, default is 1.0
         --mm            FLT     Mismatch, default is 0.0
         --gp            FLT     Gap penalty, default is -0.01
-        --spe       -s  STR     Separator of fields, default is "\t"
+        --sep       -s  STR     Separator of fields, default is "\t"
         --header    -H          Inputs have header lines
         --dd                    Output domain distance
 
